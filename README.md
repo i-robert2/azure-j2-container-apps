@@ -179,6 +179,19 @@ No hardcoded secrets anywhere. To make it yours:
 - **Pinned providers + committed lock file** — reproducible Terraform.
 - **Scale-to-zero** — `min_replicas = 0` keeps idle cost near zero.
 
+### Build-it-from-scratch path (if you're learning)
+
+Do it in this order, and **destroy after each milestone** to keep cost near zero and internalize the lifecycle:
+
+1. **App first.** Write the Flask app + `pytest` tests; get them green locally before any cloud.
+2. **Containerize.** Write the multistage Dockerfile; build it server-side with `az acr build` (no local Docker needed) and confirm the image is small.
+3. **Infra.** Terraform the ACR, Log Analytics, Container Apps environment, the user-assigned identity, and the `AcrPull` role. Apply the ACR first, push a bootstrap image, then apply the app so it has something to pull.
+4. **Secretless auth.** Create the OIDC app registration + federated credential; wire the 3 GitHub secrets and 3 variables. Prove there's no `AZURE_CLIENT_SECRET`.
+5. **Pipeline.** Add the workflow one job at a time — `quality`, then `sast`, then `build-push`, then `deploy` — pushing and watching each go green before adding the next.
+6. **Autoscale + teardown.** Load-test to watch it scale to the cap, confirm it idles back to zero, then `terraform destroy`.
+
+> Tip: pin third-party actions (e.g. `aquasecurity/trivy-action`) to a tag that still exists — supply-chain incidents sometimes remove old tags. Check the action's releases page if a job fails to resolve.
+
 ---
 
 ## Real-world scenarios where this pattern applies
