@@ -234,6 +234,8 @@ Real problems from building this for real — the root-cause/fix is the useful p
 
 ## Cost
 
+ACR Basic (~€4/mo) is the only always-on charge. The Container App scales to zero when idle (€0); Log Analytics stays under the free tier for a lab. Typical: **~5-8 €/mo**, or run `terraform destroy` between sessions for ~€0.
+
 ---
 
 ## License
