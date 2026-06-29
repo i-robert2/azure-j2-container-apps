@@ -204,9 +204,35 @@ Do it in this order, and **destroy after each milestone** to keep cost near zero
 
 ---
 
-## Cost
+## Issues we hit (and how we fixed them)
 
-ACR Basic (~€4/mo) is the only always-on charge. The Container App scales to zero when idle (€0); Log Analytics stays under the free tier for a lab. Typical: **~5-8 €/mo**, or run `terraform destroy` between sessions for ~€0.
+Real problems from building this for real — the root-cause/fix is the useful part.
+
+### `terraform apply` failed on the Container App's placeholder image
+**Symptom:** First apply created the ACR/env/identity but **failed** on the Container App with a `MANIFEST_UNKNOWN` error; the app landed in a `Failed` state and couldn't be imported (`ResourceNotProvisioned`, 400).
+**Cause:** The walkthrough seeds the app with a non-existent `:bootstrap` image expecting a harmless "Failed" revision. With azurerm v4.x a failed revision provision is a **hard error**, so the whole apply exits 1.
+**Fix:** Build a real image into ACR **first** (no local Docker needed): `az acr build --registry <acr> --image notes-api:bootstrap --image notes-api:latest .`, then apply the rest, delete the orphaned failed app (`az containerapp delete`), and re-apply — the app comes up healthy on the real image. CI then keeps it updated.
+
+### Trivy GitHub Action wouldn't resolve
+**Symptom:** The SAST job failed immediately: `aquasecurity/trivy-action@0.24.0` — "unable to find version".
+**Cause:** After a supply-chain incident the action migrated to **v-prefixed** tags and removed the old numeric ones (`0.24.0`, `0.33.1`).
+**Fix:** Pinned **`aquasecurity/trivy-action@v0.36.0`**. (Same fix reused in M2.)
+
+### POST a note, GET returns `[]`
+**Symptom:** Creating a note then listing sometimes returned an empty array.
+**Cause:** Gunicorn runs **2 workers**, each with its own in-memory `NOTES` list, so requests hit different processes.
+**Fix:** Expected for a non-persistent demo — documented it; M1 introduces a real Postgres backend.
+
+### OIDC login worked locally but `AADSTS70021` in CI
+**Symptom:** `azure/login` failed with `AADSTS70021: No matching federated identity record`.
+**Cause:** The federated credential **subject** must match the run context exactly (`repo:i-robert2/azure-j2-container-apps:ref:refs/heads/main`) and is case-sensitive.
+**Fix:** Created separate federated credentials for `main` and `pull_request` with the exact subjects.
+
+> Heads-up for teardown: the **Container Apps environment takes ~28 minutes to delete** — that's slow, not stuck; let `terraform destroy` run.
+
+---
+
+## Cost
 
 ---
 
